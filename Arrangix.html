@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arrangix - imgs to Docx/PDF</title>
+<style>
+  :root{
+    --bg:#151210;
+    --bg2:#1c1815;
+    --card:#1f1b17;
+    --ink:#f2ece1;
+    --sub:#a89e8d;
+    --line:#3a332b;
+    --amber:#d98f2b;
+    --amber-dim:#3a2c17;
+    --warn:#e08a4f;
+    --warn-bg:#3a2416;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(var(--line) 1px, transparent 1px) 0 0/22px 22px,
+      var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  header{
+    padding:30px 24px 20px;
+    border-bottom:2px solid var(--amber);
+    background:var(--bg2);
+  }
+  header h1{
+    margin:0 0 4px;
+    font-size:25px;
+    letter-spacing:3px;
+    color:var(--amber);
+    font-family:'Courier New', ui-monospace, monospace;
+    text-shadow:0 0 22px rgba(217,143,43,0.35);
+  }
+  header p{
+    margin:0;
+    color:var(--sub);
+    font-size:13.5px;
+  }
+  .wrap{
+    max-width:960px;
+    margin:0 auto;
+    padding:24px;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:26px;
+  }
+  .card{
+    background:var(--card);
+    border:1.5px solid var(--line);
+    border-radius:12px;
+    padding:22px 24px;
+    box-shadow:0 6px 24px rgba(0,0,0,0.35), 0 0 0 1px rgba(217,143,43,0.03);
+  }
+  .card h2{
+    font-size:12.5px;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    margin:0 0 14px;
+    color:var(--amber);
+    font-family:'Courier New', ui-monospace, monospace;
+  }
+  .drop{
+    border:2px dashed var(--line);
+    border-radius:8px;
+    padding:22px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.drag{
+    border-color:var(--amber);
+    background:var(--amber-dim);
+  }
+  .drop input{display:none;}
+  .drop .big{font-size:14.5px; font-weight:600; color:var(--ink);}
+  .drop .small{font-size:12.5px; color:var(--sub); margin-top:4px;}
+  #fileList{
+    margin-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .thumbCard{
+    width:106px;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    overflow:hidden;
+    background:var(--bg2);
+    position:relative;
+    transition:transform .15s, box-shadow .15s;
+  }
+  .thumbCard:hover{transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,0,0,0.4);}
+  .thumbCard.error{border-color:var(--warn);}
+  .thumbCard.dragOver{border-color:var(--amber); box-shadow:0 0 0 2px var(--amber) inset;}
+  .thumbCard.dragging{opacity:0.4;}
+  .thumbImgWrap{
+    width:100%;
+    height:78px;
+    background:repeating-linear-gradient(45deg, #241f19, #241f19 6px, #211d18 6px, #211d18 12px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    position:relative;
+  }
+  .thumbImgWrap::before, .thumbImgWrap::after{
+    content:'';
+    position:absolute;
+    left:0; right:0;
+    height:5px;
+    background:repeating-linear-gradient(90deg, var(--bg) 0 4px, transparent 4px 8px);
+  }
+  .thumbImgWrap::before{top:0;}
+  .thumbImgWrap::after{bottom:0;}
+  .thumbImgWrap img{width:100%; height:100%; object-fit:cover; display:block;}
+  .thumbSpin{font-size:10px; color:var(--sub);}
+  .thumbErr{font-size:9px; color:var(--warn); padding:4px; text-align:center; line-height:1.3;}
+  .thumbName{
+    font-size:9.5px;
+    padding:5px 6px 3px;
+    color:var(--sub);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .thumbActions{display:flex; border-top:1px solid var(--line); align-items:stretch;}
+  .thumbActions button{
+    flex:1;
+    border:none;
+    background:var(--bg2);
+    padding:6px 0;
+    font-size:13px;
+    cursor:pointer;
+    color:var(--sub);
+    border-right:1px solid var(--line);
+  }
+  .thumbActions button:last-child{border-right:none;}
+  .thumbActions button:hover{background:var(--amber-dim); color:var(--amber);}
+  .thumbActions button.remove:hover{background:var(--warn-bg); color:var(--warn);}
+  .thumbActions .dragHandle{
+    flex:0 0 22px;
+    cursor:grab;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    color:var(--sub);
+    background:var(--bg2);
+    border-right:1px solid var(--line);
+    font-size:12px;
+  }
+  body.mode-grid .thumbActions .dragHandle{display:flex;}
+  .row{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-top:4px;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:120px;
+  }
+  .field label{
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--sub);
+  }
+  .field input[type=number]{
+    padding:9px 10px;
+    border:1.5px solid var(--line);
+    border-radius:6px;
+    font-size:16px;
+    width:100%;
+    background:var(--bg2);
+    color:var(--amber);
+    font-family:'Courier New', ui-monospace, monospace;
+    box-shadow:inset 0 2px 5px rgba(0,0,0,0.45);
+  }
+  .field input[type=number]:focus{outline:2px solid var(--amber); border-color:var(--amber);}
+  .field input[type=text]{
+    padding:9px 10px;
+    border:1.5px solid var(--line);
+    border-radius:6px;
+    font-size:15px;
+    width:100%;
+    background:var(--bg2);
+    color:var(--amber);
+    font-family:'Courier New', ui-monospace, monospace;
+    box-shadow:inset 0 2px 5px rgba(0,0,0,0.45);
+  }
+  .field input[type=text]:focus{outline:2px solid var(--amber); border-color:var(--amber);}
+  .fileNameField{margin-top:14px;}
+  .helperLine{
+    font-size:12px;
+    color:var(--sub);
+    margin-top:10px;
+    font-style:italic;
+  }
+  .formatRow{
+    display:flex;
+    gap:10px;
+    margin:14px 0;
+  }
+  .formatOpt{
+    flex:1;
+    text-align:center;
+    border:1.5px solid var(--line);
+    border-radius:7px;
+    padding:10px 8px;
+    font-size:13px;
+    color:var(--sub);
+    cursor:pointer;
+    background:var(--bg2);
+    transition:transform .15s, box-shadow .15s, border-color .15s;
+  }
+  .formatOpt:hover{transform:translateY(-1px);}
+  .formatOpt.active{
+    border-color:var(--amber);
+    background:var(--amber-dim);
+    color:var(--ink);
+    box-shadow:0 0 0 1px rgba(217,143,43,0.4);
+  }
+  .formatOpt input{display:none;}
+  .modes{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-bottom:18px;
+  }
+  .mode-opt{
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    padding:14px;
+    cursor:pointer;
+    position:relative;
+    background:var(--bg2);
+    transition:transform .15s, box-shadow .15s, border-color .15s;
+  }
+  .mode-opt:hover{transform:translateY(-1px);}
+  .mode-opt.active{
+    border-color:var(--amber);
+    background:var(--amber-dim);
+    box-shadow:0 0 0 1px rgba(217,143,43,0.4), 0 4px 14px rgba(217,143,43,0.08);
+  }
+  .mode-opt input{position:absolute; top:12px; right:12px;}
+  .mode-opt h3{margin:0 0 4px; font-size:14px; color:var(--ink);}
+  .mode-opt p{margin:0; font-size:12px; color:var(--sub); line-height:1.4;}
+  button.primary{
+    background:linear-gradient(180deg, #e6a03f, var(--amber));
+    color:#1a1310;
+    border:none;
+    padding:13px 22px;
+    border-radius:7px;
+    font-size:14.5px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    cursor:pointer;
+    width:100%;
+    font-family:'Courier New', ui-monospace, monospace;
+    box-shadow:0 3px 10px rgba(217,143,43,0.25);
+    transition:transform .1s, box-shadow .15s;
+  }
+  button.primary:not(:disabled):hover{transform:translateY(-1px); box-shadow:0 5px 16px rgba(217,143,43,0.35);}
+  button.primary:disabled{
+    background:#4a4238;
+    color:#8b8377;
+    cursor:not-allowed;
+    box-shadow:none;
+  }
+  .summary{
+    font-size:13px;
+    color:var(--sub);
+    margin:14px 0;
+    padding:10px 12px;
+    background:var(--bg2);
+    border-radius:6px;
+    border:1px solid var(--line);
+  }
+  .warnbox{
+    margin-top:14px;
+    background:var(--warn-bg);
+    border:1px solid var(--warn);
+    color:var(--warn);
+    padding:10px 12px;
+    border-radius:6px;
+    font-size:12.5px;
+    display:none;
+    white-space:pre-line;
+  }
+  .status{
+    margin-top:12px;
+    font-size:13px;
+    color:var(--sub);
+    display:none;
+  }
+  .clearlink{
+    font-size:12px;
+    color:var(--amber);
+    text-decoration:underline;
+    cursor:pointer;
+    margin-top:10px;
+    display:inline-block;
+  }
+  .previewWrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+  }
+  .previewPage{
+    position:relative;
+    width:100%;
+    max-width:300px;
+    aspect-ratio:11906/16838;
+    background:#fdfbf6;
+    border:1px solid var(--line);
+    box-shadow:0 4px 18px rgba(0,0,0,0.4);
+  }
+  .previewPage .ph{
+    position:absolute;
+    background:#e7e2d6;
+    border:1px solid #c9c2b0;
+    overflow:hidden;
+  }
+  .previewPage .ph img{width:100%; height:100%; object-fit:contain; background:#fdfbf6;}
+  .previewEmpty{
+    font-size:12.5px;
+    color:var(--sub);
+    text-align:center;
+    padding:30px 10px;
+  }
+  .previewNav{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    font-size:12.5px;
+    color:var(--sub);
+    font-family:'Courier New', ui-monospace, monospace;
+  }
+  .previewNav button{
+    background:var(--bg2);
+    border:1px solid var(--line);
+    color:var(--amber);
+    border-radius:5px;
+    padding:4px 10px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .previewNav button:disabled{color:var(--sub); cursor:not-allowed;}
+  .field select{padding:9px 10px;border:1.5px solid var(--line);border-radius:6px;font-size:14px;width:100%;background:var(--bg2);color:var(--amber);font-family:'Courier New',ui-monospace,monospace;}
+  .field select:focus{outline:2px solid var(--amber);border-color:var(--amber);}
+  .rotRow{margin-top:14px;gap:10px;}
+  .miniBtn{background:var(--bg2);border:1px solid var(--line);color:var(--amber);border-radius:6px;padding:7px 12px;font-size:12.5px;cursor:pointer;}
+  .miniBtn:hover{background:var(--amber-dim);}
+  body.mode-smart .gridOnly,body.mode-smart .rowsField{display:none;}
+  .thumbActions .dragHandle{touch-action:none;}
+  .orderBar{display:none;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;}
+  .orderBar select{padding:7px 10px;border:1.5px solid var(--line);border-radius:6px;font-size:13px;background:var(--bg2);color:var(--amber);font-family:'Courier New',ui-monospace,monospace;}
+  .orderBar select:disabled{opacity:.45;cursor:not-allowed;}
+  .thumbCard{position:relative;cursor:pointer;}
+  .thumbCard.selected{box-shadow:0 0 0 2px var(--amber);}
+  #fileList .thumbImgWrap img{object-fit:contain;background:#14110d;}
+  .dupTag{position:absolute;top:4px;left:4px;background:var(--amber);color:#1a1409;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;pointer-events:none;}
+  .formatOpt{position:relative;}
+  .formatOpt input{display:block;position:absolute;opacity:0;width:1px;height:1px;}
+  .formatOpt:focus-within{outline:2px solid var(--amber);outline-offset:2px;}
+  button:focus-visible,.clearlink:focus-visible,.miniBtn:focus-visible,.thumbCard:focus-visible,.dragHandle:focus-visible,#dropZone:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+  @media (pointer:coarse){ .thumbActions button,.thumbActions .dragHandle{min-height:40px;} .miniBtn{padding:11px 14px;} .clearlink{padding:8px 4px;} }
+  .dupTag{background:var(--g,var(--amber));max-width:calc(100% - 8px);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  .dupTag.orig{box-shadow:0 0 0 2px #1a1409 inset, 0 0 0 1px #fff4;}
+  .thumbCard.grouped:not(:focus-visible){outline:2px solid var(--g);outline-offset:-1px;}
+  .thumbCard.dragSlot{border:2px dashed var(--amber) !important;background:transparent;box-shadow:none !important;transform:none !important;outline:none !important;}
+  .thumbCard.dragSlot > *{visibility:hidden;}
+  .dragClone{box-shadow:0 14px 30px rgba(0,0,0,.55),0 0 0 2px var(--amber);opacity:.96;cursor:grabbing;border-radius:8px;}
+  body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing;}
+  .thumbCard.kbHeld{outline:3px solid var(--amber) !important;outline-offset:2px;}
+  .thumbActions .dragHandle:hover{background:var(--amber-dim);color:var(--amber);}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+  @media (pointer:coarse){ .thumbActions .dragHandle{flex:0 0 36px;} }
+</style>
+</head>
+<body class="mode-grid">
+
+<header>
+  <h1>Arrangix</h1>
+  <p>Pick images, choose a layout, export a real Word or PDF file.</p>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>1. Images</h2>
+    <div class="drop" id="dropZone">
+      <input type="file" id="fileInput" multiple accept="image/*,.heic,.heif">
+      <div class="big">Click to choose images, or drag & drop</div>
+      <div class="small">JPEG, PNG, WebP, GIF, BMP, HEIC/HEIF (iPhone photos; may need internet) all supported — use ⠿ to arrange, ⧉ to duplicate, ✕ to remove</div>
+    </div>
+    <div id="fileList"></div>
+    <div class="orderBar" id="orderBar">
+      <label for="sortSel" class="small">Sort photos</label>
+      <select id="sortSel" aria-label="Sort photos">
+        <option value="added">Order added</option>
+        <option value="date-asc">Date taken — oldest first</option>
+        <option value="date-desc">Date taken — newest first</option>
+        <option value="custom" disabled hidden>Custom order</option>
+      </select>
+      <button type="button" class="miniBtn" id="selAllBtn">Select all</button>
+      <button type="button" class="miniBtn" id="dupBtn" style="display:none"></button>
+      <span class="small" id="groupInfo"></span>
+      <span class="small" id="orderNote"></span>
+    </div>
+    <div class="orderBar" id="selBar">
+      <span class="small" id="selInfo"></span>
+      <button type="button" class="miniBtn" id="selRot">↻ Rotate selected</button>
+      <button type="button" class="miniBtn" id="selRem">✕ Remove selected</button>
+      <button type="button" class="miniBtn" id="selNone">Deselect</button>
+    </div>
+    <span class="clearlink" id="undoBtn" style="display:none;margin-right:14px;">Undo</span>
+    <span class="clearlink" id="clearBtn" style="display:none;">Clear all</span>
+    <div class="warnbox" id="warnBox"></div>
+    <div class="warnbox" id="netNotice" role="alert"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Layout</h2>
+    <div class="modes">
+      <label class="mode-opt active" id="modeGridOpt">
+        <input type="radio" name="mode" value="grid" checked>
+        <h3>Grid</h3>
+        <p>Fixed boxes, your order kept. Each photo is shown whole and centred in its box — never cropped or stretched (white bars appear if the shapes differ).</p>
+      </label>
+      <label class="mode-opt" id="modeSmartOpt">
+        <input type="radio" name="mode" value="smart">
+        <h3>Smart</h3>
+        <p>Auto-packed to fill each page top to bottom, so fewer pages are needed. Order isn't preserved. Columns sets the width; Rows isn't used.</p>
+      </label>
+    </div>
+
+    <div class="row">
+      <div class="field rowsField">
+        <label for="rowsInput">Rows</label>
+        <input type="number" id="rowsInput" min="1" max="10" value="2">
+      </div>
+      <div class="field">
+        <label for="colsInput">Columns</label>
+        <input type="number" id="colsInput" min="1" max="10" value="2">
+      </div>
+      <div class="field">
+        <label for="gapInput">Gap (mm)</label>
+        <input type="number" id="gapInput" min="0" max="30" value="4">
+      </div>
+      <div class="field"><label for="pageSizeSel">Page size</label><select id="pageSizeSel"><option value="a4">A4</option><option value="a5">A5</option><option value="a3">A3</option><option value="letter">Letter</option><option value="square">Square (20×20 cm)</option><option value="custom">Custom…</option></select></div>
+      <div class="field"><label for="orientSel">Orientation</label><select id="orientSel"><option value="p">Portrait</option><option value="l">Landscape</option></select></div>
+      <div class="field" id="customWField" style="display:none"><label for="customWInput">Width (mm)</label><input type="number" id="customWInput" min="50" max="558" value="210"></div>
+      <div class="field" id="customHField" style="display:none"><label for="customHInput">Height (mm)</label><input type="number" id="customHInput" min="50" max="558" value="297"></div>
+      <div class="field"><label for="qualitySel">Quality</label><select id="qualitySel"><option value="std">Standard (150 DPI)</option><option value="high">High (220 DPI)</option><option value="max">Maximum (300 DPI)</option><option value="orig">Original detail (large file)</option></select></div>
+    </div>
+    <div class="row rotRow gridOnly"><label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px;color:var(--amber);"><input type="checkbox" id="autoRotChk"> Auto-rotate photos to fit their box (Grid only, never crops or stretches)</label></div>
+    <div class="row rotRow"><label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px;color:var(--amber);"><input type="checkbox" id="safeMarginChk"> Printer-safe margin (10 mm instead of 6.35 mm) — keeps photos clear of the edge many printers can't print</label></div>
+    <div class="helperLine" id="helperLine"></div>
+    <span class="clearlink" id="resetSettings">Reset settings</span>
+
+    <div class="summary" id="summaryBox">Add images to see how many pages this will produce.</div>
+
+    <div class="field fileNameField">
+      <label for="fileNameInput">File name (optional)</label>
+      <input type="text" id="fileNameInput" maxlength="100" placeholder="Leave empty for automatic name" autocomplete="off">
+    </div>
+
+    <div class="formatRow">
+      <label class="formatOpt active" id="formatDocxOpt">
+        <input type="radio" name="format" value="docx" checked>
+        Word (.docx)
+      </label>
+      <label class="formatOpt" id="formatPdfOpt">
+        <input type="radio" name="format" value="pdf">
+        PDF (.pdf)
+      </label>
+    </div>
+
+    <button class="primary" id="generateBtn" disabled>Select images to continue</button>
+    <div class="status" id="statusBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>3. Preview</h2>
+    <div class="previewWrap">
+      <div class="previewPage" id="previewPage">
+        <div class="previewEmpty" id="previewEmpty">Add images to see a preview.</div>
+      </div>
+      <div class="previewNav" id="previewNav" style="display:none;">
+        <button id="prevPageBtn">‹</button>
+        <span id="previewLabel">Page 1 of 1</span>
+        <button id="nextPageBtn">›</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<script>
+/* ---------------- constants (A4 portrait, twips: 1440 = 1 inch) ---------------- */
+let PAGE_W = 11906, PAGE_H = 16838;
+let MARGIN = 360; // 0.25in; printer-safe = 567 (10 mm)
+const DPI = 150;
+const EMU_PER_TWIP = 635;
+
+/* ---------------- state ---------------- */
+// items: [{id, file, name, status:'loading'|'ready'|'error', errorMsg, previewUrl, img, aspect, donePromise}]
+let items = [];
+let nextId = 1;
+let loadedImages = null; // built at generate time from ready items
+let previewPageIndex = 0;
+
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const fileListEl = document.getElementById('fileList');
+const clearBtn = document.getElementById('clearBtn');
+const warnBox = document.getElementById('warnBox');
+const rowsInput = document.getElementById('rowsInput');
+const colsInput = document.getElementById('colsInput');
+const gapInput = document.getElementById('gapInput');
+const summaryBox = document.getElementById('summaryBox');
+const generateBtn = document.getElementById('generateBtn');
+const statusBox = document.getElementById('statusBox');
+const modeGridOpt = document.getElementById('modeGridOpt');
+const modeSmartOpt = document.getElementById('modeSmartOpt');
+const formatDocxOpt = document.getElementById('formatDocxOpt');
+const formatPdfOpt = document.getElementById('formatPdfOpt');
+const helperLine = document.getElementById('helperLine');
+const previewPageEl = document.getElementById('previewPage');
+const previewEmptyEl = document.getElementById('previewEmpty');
+const previewNavEl = document.getElementById('previewNav');
+const previewLabelEl = document.getElementById('previewLabel');
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const safeMarginChk = document.getElementById('safeMarginChk');
+const customWInput = document.getElementById('customWInput'), customHInput = document.getElementById('customHInput');
+const pageSizeSel = document.getElementById('pageSizeSel'), orientSel = document.getElementById('orientSel'), qualitySel = document.getElementById('qualitySel');
+function num(el,min,max,def){ let v=parseFloat(el.value); if(isNaN(v)) v=def; return Math.min(max,Math.max(min,v)); }
+function applyPage(){
+  const custom = pageSizeSel.value==='custom';
+  document.getElementById('customWField').style.display = document.getElementById('customHField').style.display = custom ? '' : 'none';
+  const PS = {a4:[11906,16838], a5:[8419,11906], a3:[16838,23811], letter:[12240,15840], square:[11339,11339]};
+  let [w,h] = custom ? [Math.round(num(customWInput,50,558,210)*56.6929), Math.round(num(customHInput,50,558,297)*56.6929)] : (PS[pageSizeSel.value]||PS.a4);
+  if(w!==h && (w>h)!==(orientSel.value==='l')) [w,h]=[h,w];
+  PAGE_W=w; PAGE_H=h;
+  MARGIN = safeMarginChk.checked ? 567 : 360;
+  previewPageEl.style.aspectRatio = w+'/'+h;
+  previewPageEl.style.maxWidth = w>h ? '420px' : '300px';
+}
+const autoRotChk=document.getElementById('autoRotChk');
+let capNote=false;
+function effRot(it){ return ((it.rot||0)+(it.autoRot||0))%360; }
+function effAspect(it){ return effRot(it)%180 ? 1/it.aspect : it.aspect; }
+function updateAutoRot(){
+  const on = autoRotChk.checked && currentMode()==='grid';
+  const cw=(PAGE_W-2*MARGIN)/num(colsInput,1,10,2), ch=(PAGE_H-2*MARGIN)/num(rowsInput,1,10,2);
+  let changed=false;
+  items.forEach(it=>{
+    const old=it.autoRot||0; it.autoRot=0;
+    if(on && it.status==='ready'){
+      const a=(it.rot||0)%180 ? 1/it.aspect : it.aspect;
+      const w0=Math.min(cw,ch*a), w1=Math.min(cw,ch/a);
+      if(w1*w1*a > (w0*w0/a)*1.05) it.autoRot=90;
+    }
+    if(it.autoRot!==old) changed=true;
+  });
+  return changed;
+}
+function fitBox(pl,r){ const a=r.w/r.h; let w=pl.w,h=pl.h; if(w/h>a) w=h*a; else h=w/a; pl.x+=(pl.w-w)/2; pl.y+=(pl.h-h)/2; pl.w=w; pl.h=h; }
+async function decodeBlob(blob){
+  if(typeof createImageBitmap==='function'){
+    try{ return await createImageBitmap(blob,{imageOrientation:'from-image'}); }catch(e){}
+    try{ return await createImageBitmap(blob); }catch(e){}
+  }
+  const url = await blobToDataURL(blob), im = new Image();
+  await new Promise((res,rej)=>{ im.onload=res; im.onerror=()=>rej(new Error('browser could not decode this image')); im.src=url; });
+  return im;
+}
+function loadFull(it){ return decodeBlob(it.blob); }
+function drawRot(ctx,img,rot,cx,cy,dw,dh){
+  const odd=rot%180, iw=odd?dh:dw, ih=odd?dw:dh;
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot*Math.PI/180); ctx.drawImage(img,-iw/2,-ih/2,iw,ih); ctx.restore();
+}
+function viewUrl(it){
+  const r=effRot(it); if(!r) return it.previewUrl;
+  if(it._ru && it._ru.r===r) return it._ru.u;
+  const sw=it.small.naturalWidth, sh=it.small.naturalHeight, odd=r%180, rw=odd?sh:sw, rh=odd?sw:sh, k=Math.min(1,900/Math.max(rw,rh));
+  const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(rw*k)); c.height=Math.max(1,Math.round(rh*k));
+  const x=c.getContext('2d'); x.imageSmoothingQuality='high'; drawRot(x,it.small,r,c.width/2,c.height/2,c.width,c.height);
+  it._ru={r,u:c.toDataURL('image/jpeg',0.8)}; return it._ru.u;
+}
+autoRotChk.addEventListener('change',()=>{ refreshAll(); });
+function loadHeic(){
+  if(typeof heic2any==='function') return Promise.resolve();
+  return new Promise((res,rej)=>{ const t=document.createElement('script'); t.src='https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.1/index.min.js'; t.onload=res; t.onerror=()=>rej(new Error('HEIC converter needs an internet connection')); document.head.appendChild(t); });
+}
+const SK='arrangix.settings';
+function saveSettings(){ try{ localStorage.setItem(SK,JSON.stringify({rows:rowsInput.value,cols:colsInput.value,gap:gapInput.value,ps:pageSizeSel.value,cw:customWInput.value,ch:customHInput.value,or:orientSel.value,q:qualitySel.value,ar:autoRotChk.checked,sm:safeMarginChk.checked,mode:currentMode(),fmt:currentFormat()})); }catch(e){} }
+function loadSettings(){ try{ const o=JSON.parse(localStorage.getItem(SK)||'null'); if(!o) return;
+  rowsInput.value=o.rows; colsInput.value=o.cols; gapInput.value=o.gap; pageSizeSel.value=o.ps; customWInput.value=o.cw||210; customHInput.value=o.ch||297; orientSel.value=o.or; qualitySel.value=o.q; autoRotChk.checked=!!o.ar; safeMarginChk.checked=!!o.sm;
+  (o.mode==='smart'?modeSmartOpt:modeGridOpt).click(); (o.fmt==='pdf'?formatPdfOpt:formatDocxOpt).click(); }catch(e){} }
+document.addEventListener('change',saveSettings); document.addEventListener('input',saveSettings);
+document.getElementById('resetSettings').addEventListener('click',()=>{ try{localStorage.removeItem(SK);}catch(e){} rowsInput.value=2; colsInput.value=2; gapInput.value=4; pageSizeSel.value='a4'; customWInput.value=210; customHInput.value=297; orientSel.value='p'; qualitySel.value='std'; autoRotChk.checked=false; safeMarginChk.checked=false; modeGridOpt.click(); formatDocxOpt.click(); refreshAll(); });
+[pageSizeSel,orientSel,qualitySel,safeMarginChk,customWInput,customHInput].forEach(el=>el.addEventListener('change',refreshAll));
+
+dropZone.addEventListener('click', ()=> fileInput.click());
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e=>{
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  addFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', ()=>{ addFiles(fileInput.files); fileInput.value=''; });
+clearBtn.addEventListener('click', ()=>{
+  pushUndo();
+  items = [];
+  renderFileList();
+  refreshAll();
+});
+[rowsInput, colsInput, gapInput].forEach(el=> el.addEventListener('input', refreshAll));
+[modeGridOpt, modeSmartOpt].forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    modeGridOpt.classList.toggle('active', opt===modeGridOpt);
+    modeSmartOpt.classList.toggle('active', opt===modeSmartOpt);
+    document.body.classList.toggle('mode-grid', opt===modeGridOpt);
+    document.body.classList.toggle('mode-smart', opt===modeSmartOpt);
+    previewPageIndex = 0;
+    refreshAll();
+  });
+});
+[formatDocxOpt, formatPdfOpt].forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    formatDocxOpt.classList.toggle('active', opt===formatDocxOpt);
+    formatPdfOpt.classList.toggle('active', opt===formatPdfOpt);
+  });
+});
+function currentFormat(){
+  return document.querySelector('input[name=format]:checked').value;
+}
+prevPageBtn.addEventListener('click', ()=>{ previewPageIndex = Math.max(0, previewPageIndex-1); renderPreview(); });
+nextPageBtn.addEventListener('click', ()=>{ previewPageIndex += 1; renderPreview(); });
+
+function refreshAll(){
+  applyPage();
+  updateOrderBar();
+  if(updateAutoRot()) renderFileList();
+  updateSummary();
+  updateHelperLine();
+  renderPreview();
+}
+
+/* ---------------- undo + order tools ---------------- */
+const undoBtn = document.getElementById('undoBtn'), orderBar = document.getElementById('orderBar'),
+      sortSel = document.getElementById('sortSel'), orderNote = document.getElementById('orderNote');
+const undoStack = [];
+function pushUndo(){ undoStack.push({list:items.slice(), rots:items.map(i=>i.rot||0)}); if(undoStack.length>20) undoStack.shift(); }
+function undo(){
+  const st = undoStack.pop(); if(!st) return;
+  items = st.list; items.forEach((it,i)=>{ it.rot = st.rots[i]; });
+  renderFileList(); refreshAll();
+}
+undoBtn.addEventListener('click', undo);
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && !e.shiftKey && e.key.toLowerCase()==='z' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)){ e.preventDefault(); undo(); }
+});
+function updateOrderBar(){
+  const grid = currentMode()==='grid', nd = items.filter(i=>i.grp && !i.grp.orig && !i.isCopy).length, ns = items.filter(i=>i.sel).length;
+  orderBar.style.display = items.length>1 ? 'flex' : 'none';
+  sortSel.disabled = !grid;
+  syncSortSel();
+  orderNote.textContent = grid ? '' : 'Smart arranges photos itself — use Grid to keep order.';
+  dupBtn.style.display = nd ? 'inline-block' : 'none';
+  dupBtn.textContent = 'Remove ' + nd + ' similar (keeps originals)';
+  document.getElementById('groupInfo').textContent = groupSummary;
+  selBar.style.display = ns ? 'flex' : 'none';
+  selInfo.textContent = ns + ' selected';
+}
+const selBar=document.getElementById('selBar'), selInfo=document.getElementById('selInfo'), dupBtn=document.getElementById('dupBtn');
+let lastSel = null;
+function toggleSel(id, shift){
+  const idx = items.findIndex(i=>i.id===id); if(idx<0) return;
+  if(shift && lastSel!==null){ const a = items.findIndex(i=>i.id===lastSel); if(a>=0) for(let k=Math.min(a,idx); k<=Math.max(a,idx); k++) items[k].sel = true; }
+  else items[idx].sel = !items[idx].sel;
+  lastSel = id; renderFileList();
+}
+document.getElementById('selAllBtn').addEventListener('click', ()=>{ items.forEach(i=>i.sel=true); renderFileList(); });
+document.getElementById('selNone').addEventListener('click', ()=>{ items.forEach(i=>i.sel=false); renderFileList(); });
+document.getElementById('selRot').addEventListener('click', ()=>{ pushUndo(); items.forEach(i=>{ if(i.sel && i.status==='ready') i.rot=((i.rot||0)+90)%360; }); renderFileList(); refreshAll(); });
+document.getElementById('selRem').addEventListener('click', ()=>{ pushUndo(); items = items.filter(i=>!i.sel); renderFileList(); refreshAll(); });
+dupBtn.addEventListener('click', ()=>{ pushUndo(); items = items.filter(i=>!(i.grp && !i.grp.orig && !i.isCopy)); renderFileList(); refreshAll(); });
+function makeSig(img){
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img,0,0,64,64);
+  const d = x.getImageData(0,0,64,64).data, g = new Uint8Array(4096); let mn=255, mx=0;
+  for(let i=0;i<4096;i++){ const v = d[i*4]*0.299 + d[i*4+1]*0.587 + d[i*4+2]*0.114; g[i]=v; if(v<mn) mn=v; if(v>mx) mx=v; }
+  return (mx-mn < 12) ? null : g;      // flat, near-blank images are never compared
+}
+// Same picture only: tiny average difference AND no 4x4-pixel region that differs noticeably
+function sameImage(a, b){
+  let sum = 0; const bl = new Float32Array(256);
+  for(let i=0;i<4096;i++){ const df = a[i]-b[i]; sum += Math.abs(df); bl[(i>>6>>2)*16 + ((i&63)>>2)] += df; }
+  if(sum/4096 > 4) return false;
+  for(let k=0;k<256;k++) if(Math.abs(bl[k]/16) > 24) return false;
+  return true;
+}
+let dupKey = '', groupSummary = '';
+const GROUP_COLORS = ['#e8a33d','#4fb3d9','#7bc47f','#d9738c','#a98be0','#d9c24f'];
+function groupLetters(n){ let r=''; n++; while(n>0){ const m=(n-1)%26; r=String.fromCharCode(65+m)+r; n=Math.floor((n-1)/26); } return r; }
+function looksSame(o, it){ return !!(o.sig && it.sig) && Math.abs(o.aspect-it.aspect)/o.aspect < 0.01 && sameImage(o.sig, it.sig); }
+// Groups photos that are the same picture. The FIRST photo of a group in the current list is the Original.
+function markDuplicates(){
+  const key = items.map(i=>i.id + (i.sig?'s':'') + (i.isCopy?'c':'') + i.status).join(',');
+  if(key===dupKey) return; dupKey = key;
+  items.forEach(it=>{ it.grp = null; });
+  const ready = items.filter(i=>i.status==='ready'), groups = [], byId = new Map();
+  const place = (it, g)=>{ if(!g){ g = {members:[]}; groups.push(g); } g.members.push(it); byId.set(it.id, g); };
+  ready.filter(i=>!i.isCopy).forEach(it=> place(it, groups.find(g=>looksSame(g.members[0], it))));
+  ready.filter(i=>i.isCopy).forEach(it=> place(it, byId.get(it.rootId) || groups.find(g=>looksSame(g.members[0], it))));
+  const real = groups.filter(g=>g.members.length>1);
+  real.forEach(g=> g.members.sort((a,b)=> items.indexOf(a)-items.indexOf(b)));
+  real.sort((a,b)=> items.indexOf(a.members[0])-items.indexOf(b.members[0]));
+  groupSummary = real.map((g,gi)=>{
+    const letter = groupLetters(gi), color = GROUP_COLORS[gi % GROUP_COLORS.length];
+    g.members.forEach((m,k)=>{ m.grp = {letter, n:k, orig:k===0, color}; });
+    return letter + ': original + ' + (g.members.length-1) + ' similar';
+  }).join(' · ');
+}
+function softPrintCount(ready, rows, cols, gapTw){
+  const grid = currentMode()==='grid';
+  const pages = grid ? computeGridLayout(ready.length, rows, cols, gapTw) : computeSmartLayout(ready.map(it=>({aspect:effAspect(it), odd:effRot(it)%180?1:0})), rows, cols, gapTw);
+  const bad = new Set();
+  pages.forEach(pg=>pg.forEach(pl=>{
+    if(pl.imageIndex==null) return; const it = ready[pl.imageIndex]; if(!it || !it.nw) return;
+    const odd = effRot(it)%180, rw = odd?it.nh:it.nw, rh = odd?it.nw:it.nh;
+    const sc = grid ? Math.min(pl.w/rw, pl.h/rh) : pl.w/rw;
+    if(1440/sc < 150) bad.add(it.id);
+  }));
+  return bad.size;
+}
+function say(m){ const l=document.getElementById('liveMsg'); l.textContent=''; setTimeout(()=>{ l.textContent=m; },30); }
+function toggleKbHold(id){
+  const it = items.find(i=>i.id===id); if(!it) return;
+  if(kbHold && kbHold.id===id){
+    const moved = kbHold.order.some((x,i)=>x!==items[i].id); if(!moved) undoStack.pop();
+    kbHold = null; say('Dropped ' + it.name); renderFileList(); refreshAll();
+  } else {
+    pushUndo(); kbHold = {id, order: items.map(i=>i.id)}; say('Picked up ' + it.name + '. Use the arrow keys to move it, Space to drop, Escape to cancel.'); renderFileList();
+  }
+  const c = [...fileListEl.querySelectorAll('.thumbCard')].find(x=>Number(x.dataset.id)===id); if(c){ const h=c.querySelector('.dragHandle'); if(h) h.focus(); }
+}
+function cancelKbHold(){
+  if(!kbHold) return; const map = new Map(items.map(i=>[i.id,i])), id = kbHold.id;
+  items = kbHold.order.map(x=>map.get(x)); undoStack.pop(); kbHold = null; say('Cancelled'); renderFileList(); refreshAll();
+  const c = [...fileListEl.querySelectorAll('.thumbCard')].find(x=>Number(x.dataset.id)===id); if(c){ const h=c.querySelector('.dragHandle'); if(h) h.focus(); }
+}
+function moveItem(id, d, quiet){
+  const i = items.findIndex(x=>x.id===id), j = i+d; if(i<0 || j<0 || j>=items.length) return;
+  if(!quiet) pushUndo(); [items[i], items[j]] = [items[j], items[i]]; renderFileList(); refreshAll();
+  if(quiet) say(items[j].name + ', position ' + (j+1) + ' of ' + items.length);
+  const c = fileListEl.querySelectorAll('.thumbCard')[j]; if(c){ const h = c.querySelector('.dragHandle'); if(h) h.focus(); }
+}
+let netDismissed = false;
+function updateNetNotice(){
+  const n = items.filter(i=>i.netFail).length, box = document.getElementById('netNotice');
+  if(!n){ box.style.display = 'none'; netDismissed = false; return; }
+  if(netDismissed){ box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = 'Sorry — ' + n + ' iPhone (HEIC) photo' + (n>1?'s need':' needs') + ' an internet connection to convert, and you appear to be offline. Connect to the internet and try again, or convert the photo to JPEG first. Every other photo type works offline. ';
+  const mk = (t,f)=>{ const b = document.createElement('button'); b.type='button'; b.className='miniBtn'; b.textContent=t; b.style.marginRight='8px'; b.addEventListener('click', f); box.appendChild(b); };
+  mk('Try again', ()=>{ netDismissed=false; items.filter(i=>i.netFail).forEach(it=>{ it.netFail=false; it.status='loading'; it.errorMsg=null; it.donePromise = processItem(it); }); renderFileList(); });
+  mk('Dismiss', ()=>{ netDismissed = true; updateNetNotice(); });
+}
+function decorateCards(){
+  fileListEl.querySelectorAll('.thumbCard').forEach((c,i)=>{
+    const it = items[i]; if(!it) return;
+    c.tabIndex = 0; c.setAttribute('role','button'); c.setAttribute('aria-pressed', it.sel ? 'true' : 'false');
+    c.setAttribute('aria-label', it.name + (it.sel ? ' (selected)' : '') + ' — Enter to select');
+    c.classList.toggle('selected', !!it.sel); c.classList.toggle('kbHeld', !!(kbHold && kbHold.id===it.id));
+    c.addEventListener('click', e=>{ if(e.target.closest('.thumbActions')) return; toggleSel(it.id, e.shiftKey); });
+    c.addEventListener('keydown', e=>{ if(e.target===c && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); toggleSel(it.id, e.shiftKey); } });
+    c.querySelectorAll('button').forEach(b=> b.setAttribute('aria-label', (b.title||'Action') + ' — ' + it.name));
+    const h = c.querySelector('.dragHandle');
+    if(h){ h.tabIndex = 0; h.setAttribute('role','button'); h.setAttribute('aria-label','Move ' + it.name + ' — arrow keys');
+      h.addEventListener('keydown', e=>{
+        if(currentMode()!=='grid') return;
+        if(e.key===' ' || e.key==='Enter'){ e.preventDefault(); toggleKbHold(it.id); return; }
+        if(e.key==='Escape' && kbHold){ e.preventDefault(); cancelKbHold(); return; }
+        const d = {ArrowLeft:-1, ArrowUp:-1, ArrowRight:1, ArrowDown:1}[e.key]; if(!d) return;
+        e.preventDefault(); moveItem(it.id, d, !!(kbHold && kbHold.id===it.id));
+      });
+    }
+    if(it.grp){
+      const g = it.grp, t = document.createElement('div');
+      t.className = 'dupTag' + (g.orig ? ' orig' : ''); t.textContent = g.orig ? 'Original ' + g.letter : 'Similar ' + g.letter + g.n;
+      t.title = g.orig ? 'Original of group ' + g.letter + ' (first in the list)' : 'Similar to the original of group ' + g.letter + (it.isCopy ? ' — made with the ⧉ button' : '');
+      c.style.setProperty('--g', g.color); c.classList.add('grouped'); c.appendChild(t);
+    }
+  });
+}
+dropZone.tabIndex = 0; dropZone.setAttribute('role','button'); dropZone.setAttribute('aria-label','Choose images to add');
+dropZone.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fileInput.click(); } });
+[undoBtn, clearBtn, document.getElementById('resetSettings')].forEach(el=>{
+  el.setAttribute('role','button'); el.tabIndex = 0;
+  el.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); el.click(); } });
+});
+summaryBox.setAttribute('aria-live','polite'); warnBox.setAttribute('role','alert');
+prevPageBtn.setAttribute('aria-label','Previous page'); nextPageBtn.setAttribute('aria-label','Next page');
+async function readTaken(file){
+  const fb = file.lastModified || 0;
+  try{
+    if(!/\.jpe?g$/i.test(file.name) && !/jpe?g/i.test(file.type)) return fb;
+    const dv = new DataView(await file.slice(0,262144).arrayBuffer());
+    if(dv.getUint16(0)!==0xFFD8) return fb;
+    let p = 2;
+    while(p+4 < dv.byteLength){
+      const mk = dv.getUint16(p), len = dv.getUint16(p+2);
+      if(mk===0xFFE1 && dv.getUint32(p+4)===0x45786966){
+        const t = p+10, le = dv.getUint16(t)===0x4949;
+        const u16=o=>dv.getUint16(t+o,le), u32=o=>dv.getUint32(t+o,le);
+        const str=(o,n)=>{ let r=''; for(let i=0;i<n;i++){ const c=dv.getUint8(t+o+i); if(!c) break; r+=String.fromCharCode(c); } return r; };
+        const find=(ifd,tag)=>{ const n=u16(ifd); for(let i=0;i<n;i++){ const e=ifd+2+i*12; if(u16(e)===tag) return {count:u32(e+4), val:e+8}; } return null; };
+        const parse=x=>{ const m=/^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)/.exec(x); return m ? new Date(+m[1],m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime() : null; };
+        const ifd0 = u32(4), ex = find(ifd0,0x8769);
+        if(ex){ const d = find(u32(ex.val),0x9003); if(d && d.count>=19){ const v=parse(str(u32(d.val),19)); if(v) return v; } }
+        const d0 = find(ifd0,0x0132); if(d0 && d0.count>=19){ const v=parse(str(u32(d0.val),19)); if(v) return v; }
+        return fb;
+      }
+      if((mk & 0xFF00)!==0xFF00) break;
+      p += 2+len;
+    }
+  }catch(e){}
+  return fb;
+}
+let lastSort = 'added';
+function cmpFor(v){
+  if(v==='date-asc') return (a,b)=> (a.taken||0)-(b.taken||0);
+  if(v==='date-desc') return (a,b)=> (b.taken||0)-(a.taken||0);
+  return (a,b)=> ((a.rootId||a.id)-(b.rootId||b.id)) || (a.id-b.id);
+}
+function inOrder(v){ const c = cmpFor(v); for(let i=1;i<items.length;i++) if(c(items[i-1],items[i])>0) return false; return true; }
+function syncSortSel(){
+  const m = [lastSort,'added','date-asc','date-desc'].find(inOrder);
+  sortSel.value = m || 'custom'; if(m) lastSort = m;
+}
+sortSel.addEventListener('change', async ()=>{
+  const v = sortSel.value;
+  if(currentMode()!=='grid' || v==='custom'){ syncSortSel(); return; }
+  await Promise.all(items.map(i=>i.takenPromise));
+  pushUndo(); const c = cmpFor(v);
+  items = items.map((it,i)=>[it,i]).sort((a,b)=> c(a[0],b[0]) || a[1]-b[1]).map(x=>x[0]);
+  lastSort = v; renderFileList(); refreshAll();
+});
+
+function addFiles(fileListObj){
+  Array.from(fileListObj).forEach(file=>{
+    const item = { id: nextId++, rot:0, file, name:file.name, status:'loading', errorMsg:null, previewUrl:null, img:null, aspect:null };
+    items.push(item);
+    item.taken = file.lastModified || 0;
+    item.takenPromise = readTaken(file).then(t=>{ item.taken = t; });
+    item.donePromise = processItem(item);
+  });
+  renderFileList();
+  refreshAll();
+}
+
+function duplicateItem(id){
+  const idx = items.findIndex(it=>it.id===id);
+  if(idx===-1) return;
+  const src = items[idx];
+  if(src.status !== 'ready') return;
+  pushUndo();
+  const copy = Object.assign({}, src, { id: nextId++, isCopy: true, sel: false, rootId: src.rootId||src.id });
+  items.splice(idx+1, 0, copy);
+  renderFileList();
+  refreshAll();
+}
+
+function removeItemById(id){
+  pushUndo();
+  items = items.filter(it=>it.id!==id);
+  renderFileList();
+  refreshAll();
+}
+
+function reorderItems(draggedId, targetId){
+  const from = items.findIndex(it=>it.id===draggedId);
+  const to = items.findIndex(it=>it.id===targetId);
+  if(from===-1 || to===-1 || from===to) return;
+  pushUndo();
+  const [moved] = items.splice(from,1);
+  items.splice(to,0,moved);
+  renderFileList();
+  refreshAll();
+}
+
+/* ---------------- image loading (incl. HEIC + orientation), cached for reuse ---------------- */
+function blobToDataURL(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = ()=> reject(new Error('FileReader failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function processItem(item){
+  try{
+    let blob = item.file;
+    const isHeic = /heic|heif/i.test(item.file.type) || /\.(heic|heif)$/i.test(item.file.name);
+    if(isHeic){
+      let native = false;   // Safari/Apple browsers can read HEIC themselves, no internet needed
+      try{ if(typeof createImageBitmap==='function'){ const t = await createImageBitmap(item.file); if(t.close) t.close(); native = true; } }catch(e){}
+      if(!native){
+        const netErr = ()=>{ const e = new Error('needs an internet connection to convert this iPhone (HEIC) photo'); e.net = true; return e; };
+        if(typeof heic2any!=='function'){
+          if(navigator.onLine===false) throw netErr();
+          try{ await loadHeic(); }catch(e){ throw netErr(); }
+        }
+        blob = await heic2any({ blob:item.file, toType:'image/jpeg', quality:0.92 });
+        if(Array.isArray(blob)) blob = blob[0];
+      }
+    }
+    const img = await decodeBlob(blob);
+    const iw = img.naturalWidth||img.width, ih = img.naturalHeight||img.height;
+    if(!iw || !ih) throw new Error('zero-size image');
+    const k = Math.min(1, 700/Math.max(iw, ih));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(iw*k)); c.height = Math.max(1, Math.round(ih*k));
+    const cx = c.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(img, 0, 0, c.width, c.height);
+    const smallUrl = c.toDataURL('image/jpeg', 0.82);
+    const small = new Image();
+    await new Promise((res,rej)=>{ small.onload=res; small.onerror=rej; small.src=smallUrl; });
+    item.blob = blob; item.previewUrl = smallUrl; item.small = small; item.img = null;
+    item.aspect = iw/ih; item.nw = iw; item.nh = ih; item.sig = makeSig(small);
+    if(img.close) img.close();
+    item.status = 'ready';
+  }catch(err){
+    item.status = 'error';
+    item.netFail = !!(err && err.net);
+    item.errorMsg = err && err.message ? err.message : 'unknown error';
+  }
+  renderFileList();
+  refreshAll();
+}
+
+/* ---------------- thumbnail list + drag reorder (Grid mode only) ---------------- */
+let dragActive = false, drag = null, kbHold = null;
+
+function renderFileList(){
+  if(dragActive){ return; }   // never rebuild the list while a photo is being dragged
+  markDuplicates();
+  fileListEl.innerHTML = '';
+  items.forEach(item=>{
+    const card = document.createElement('div');
+    card.className = 'thumbCard' + (item.status==='error' ? ' error' : '');
+    card.dataset.id = item.id;
+
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'thumbImgWrap';
+    if(item.status==='ready'){
+      const img = document.createElement('img');
+      img.src = viewUrl(item);
+      imgWrap.appendChild(img);
+    } else if(item.status==='loading'){
+      const spin = document.createElement('div');
+      spin.className = 'thumbSpin';
+      spin.textContent = 'loading…';
+      imgWrap.appendChild(spin);
+    } else {
+      const err = document.createElement('div');
+      err.className = 'thumbErr';
+      err.textContent = 'could not read' + (item.errorMsg ? ' — ' + item.errorMsg : ''); err.title = item.errorMsg || '';
+      imgWrap.appendChild(err);
+    }
+    card.appendChild(imgWrap);
+
+    const name = document.createElement('div');
+    name.className = 'thumbName';
+    name.title = item.name;
+    name.textContent = item.name;
+    card.appendChild(name);
+
+    const actions = document.createElement('div');
+    actions.className = 'thumbActions';
+
+    const handle = document.createElement('div');
+    handle.className = 'dragHandle';
+    handle.textContent = '⠿';
+    handle.addEventListener('pointerdown', e=> startDrag(e, item.id));
+    actions.appendChild(handle);
+
+    const dupBtn = document.createElement('button');
+    dupBtn.textContent = '⧉';
+    dupBtn.title = 'Duplicate';
+    dupBtn.disabled = item.status !== 'ready';
+    dupBtn.addEventListener('click', ()=> duplicateItem(item.id));
+    const rotBtn = document.createElement('button');
+    rotBtn.textContent = '↻'; rotBtn.title = 'Rotate 90°'; rotBtn.disabled = item.status !== 'ready';
+    rotBtn.addEventListener('click', ()=>{ pushUndo(); item.rot=((item.rot||0)+90)%360; renderFileList(); refreshAll(); });
+    const rmBtn = document.createElement('button');
+    rmBtn.textContent = '✕';
+    rmBtn.title = 'Remove';
+    rmBtn.className = 'remove';
+    rmBtn.addEventListener('click', ()=> removeItemById(item.id));
+    actions.appendChild(dupBtn);
+    actions.appendChild(rotBtn);
+    actions.appendChild(rmBtn);
+    card.appendChild(actions);
+
+    fileListEl.appendChild(card);
+  });
+
+  decorateCards();
+  updateNetNotice();
+  clearBtn.style.display = items.length ? 'inline-block' : 'none';
+  undoBtn.style.display = undoStack.length ? 'inline-block' : 'none';
+  updateOrderBar();
+  const usable = items.filter(it=>it.status!=='error').length;
+  generateBtn.disabled = usable === 0;
+  generateBtn.textContent = usable ? 'Generate Document' : 'Select images to continue';
+}
+
+// The photo lifts under your finger/pointer; its old spot becomes a dashed slot; the others slide aside live.
+// The slot is exactly where the photo will land.
+function startDrag(e, id){
+  if(currentMode()!=='grid' || drag || kbHold || (e.button!==undefined && e.button!==0)) return;
+  const card = fileListEl.querySelector(`[data-id="${id}"]`); if(!card) return;
+  e.preventDefault();
+  const r = card.getBoundingClientRect(), clone = card.cloneNode(true);
+  clone.classList.add('dragClone'); clone.removeAttribute('id');
+  Object.assign(clone.style, {position:'fixed', left:r.left+'px', top:r.top+'px', width:r.width+'px', height:r.height+'px', margin:'0', zIndex:'1000', pointerEvents:'none', transition:'none'});
+  document.body.appendChild(clone);
+  clone.animate([{transform:'scale(1)'},{transform:'scale(1.06)'}], {duration:120, fill:'forwards'});
+  card.classList.add('dragSlot');
+  drag = {id, card, clone, r0:r, ox:e.clientX-r.left, oy:e.clientY-r.top, x:e.clientX, y:e.clientY, raf:0};
+  dragActive = true; document.body.classList.add('dragging-now');
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', onDragEnd);
+  document.addEventListener('pointercancel', onDragCancel);
+  document.addEventListener('keydown', onDragKey);
+  drag.raf = requestAnimationFrame(dragTick);
+}
+function onDragMove(e){ if(drag){ drag.x = e.clientX; drag.y = e.clientY; } }
+function onDragKey(e){ if(e.key==='Escape'){ e.preventDefault(); endDrag(false); } }
+function onDragCancel(){ endDrag(false); }
+function onDragEnd(e){
+  if(!drag) return; drag.x = e.clientX; drag.y = e.clientY;
+  const lr = fileListEl.getBoundingClientRect(), m = 60;
+  endDrag(drag.x>=lr.left-m && drag.x<=lr.right+m && drag.y>=lr.top-m && drag.y<=lr.bottom+m);   // released far outside the list = cancel
+}
+function dragTick(){
+  if(!drag) return;
+  drag.clone.style.left = (drag.x-drag.ox)+'px'; drag.clone.style.top = (drag.y-drag.oy)+'px';
+  const m = 70;
+  if(drag.y < m) window.scrollBy(0, -Math.ceil((m-drag.y)/4));
+  else if(drag.y > window.innerHeight-m) window.scrollBy(0, Math.ceil((drag.y-(window.innerHeight-m))/4));
+  updateSlot();
+  drag.raf = requestAnimationFrame(dragTick);
+}
+// Settled layout position of a card (ignores any slide animation still in flight)
+function lrect(c){
+  const op = c.offsetParent || document.body, o = op.getBoundingClientRect();
+  const l = o.left + op.clientLeft + c.offsetLeft - op.scrollLeft, t = o.top + op.clientTop + c.offsetTop - op.scrollTop;
+  return {left:l, top:t, right:l+c.offsetWidth, bottom:t+c.offsetHeight};
+}
+function updateSlot(){
+  const slot = drag.card, cards = [...fileListEl.querySelectorAll('.thumbCard')], others = cards.filter(c=>c!==slot);
+  if(!others.length) return;
+  let ref;   // undefined = leave as is; null = move to end
+  const target = others.find(c=>{ const r=lrect(c); return drag.x>=r.left && drag.x<=r.right && drag.y>=r.top && drag.y<=r.bottom; });
+  if(target){ ref = cards.indexOf(target) > cards.indexOf(slot) ? target.nextElementSibling : target; }
+  else {
+    const f = lrect(others[0]), l = lrect(others[others.length-1]);
+    if(drag.y > l.bottom || (drag.y >= l.top && drag.x > l.right)) ref = null;
+    else if(drag.y < f.top || (drag.y <= f.bottom && drag.x < f.left)) ref = others[0];
+  }
+  if(ref===undefined || ref===slot || (ref===slot.nextElementSibling)) return;
+  const before = new Map(others.map(c=>[c, c.getBoundingClientRect()]));
+  fileListEl.insertBefore(slot, ref);
+  others.forEach(c=>{
+    const a = before.get(c), b = lrect(c), dx = a.left-b.left, dy = a.top-b.top;
+    if(dx || dy) c.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}], {duration:180, easing:'ease'});
+  });
+}
+function endDrag(commit){
+  if(!drag) return;
+  const d = drag; drag = null; cancelAnimationFrame(d.raf);
+  document.removeEventListener('pointermove', onDragMove); document.removeEventListener('pointerup', onDragEnd);
+  document.removeEventListener('pointercancel', onDragCancel); document.removeEventListener('keydown', onDragKey);
+  const order = [...fileListEl.querySelectorAll('.thumbCard')].map(c=>Number(c.dataset.id));
+  const changed = commit && order.length===items.length && order.some((x,i)=>x!==items[i].id);
+  const t = commit ? lrect(d.card) : d.r0;
+  d.clone.style.transition = 'left .16s ease, top .16s ease';
+  d.clone.style.left = t.left+'px'; d.clone.style.top = t.top+'px';
+  d.clone.animate([{transform:'scale(1.06)'},{transform:'scale(1)'}], {duration:160, fill:'forwards'});
+  setTimeout(()=>{
+    d.clone.remove(); dragActive = false; document.body.classList.remove('dragging-now');
+    if(changed){ pushUndo(); const map = new Map(items.map(i=>[i.id,i])); items = order.map(x=>map.get(x)); }
+    renderFileList(); if(changed) refreshAll();
+  }, 170);
+}
+
+function currentMode(){
+  return document.querySelector('input[name=mode]:checked').value;
+}
+
+function updateHelperLine(){
+  if(currentMode()==='grid'){
+    helperLine.textContent = 'In Grid mode, Rows × Columns is the exact number of equal-size boxes on the page.';
+  } else {
+    helperLine.textContent = 'In Smart mode, Columns sets the width and photos fill each page by height — Rows isn\'t used.';
+  }
+  if(qualitySel.value==='orig') helperLine.textContent += ' Original detail keeps full photo resolution, so files can be very large.';
+}
+
+function updateSummary(){
+  const rows = num(rowsInput,1,10,2), cols = num(colsInput,1,10,2);
+  const ready = items.filter(it=>it.status==='ready');
+  const n = items.filter(it=>it.status!=='error').length;
+  if(n===0){ summaryBox.textContent = 'Add images to see how many pages this will produce.'; return; }
+  let msg;
+  if(currentMode()==='grid'){
+    const perPage = rows*cols, pages = Math.ceil(n/perPage), blanks = pages*perPage-n;
+    msg = `${n} image${n>1?'s':''} → ${pages} page${pages>1?'s':''} (${rows}×${cols} per page).`;
+    if(blanks>0) msg += ` Last page will have ${blanks} blank cell${blanks>1?'s':''}.`;
+  } else {
+    const pages = ready.length ? computeSmartLayout(ready.map(it=>({aspect:effAspect(it),odd:effRot(it)%180?1:0})), rows, cols, Math.round(num(gapInput,0,30,4)*56.6929)).length : 1;
+    msg = `${n} image${n>1?'s':''} → ${pages} page${pages>1?'s':''} (${cols} column${cols>1?'s':''}, packed by height).`;
+  }
+  if(ready.length<n) msg += ` (${n-ready.length} still processing.)`;
+  const soft = ready.length ? softPrintCount(ready, rows, cols, Math.round(num(gapInput,0,30,4)*56.6929)) : 0;
+  if(soft) msg += ` ⚠ ${soft} photo${soft>1?'s':''} below 150 DPI at this size — may look soft when printed. Try more columns or rows, or a smaller page.`;
+  summaryBox.textContent = msg;
+}
+document.querySelectorAll('input[name=mode]').forEach(r=> r.addEventListener('change', refreshAll));
+
+/* ---------------- layout algorithms (all values in twips) ---------------- */
+function computeGridLayout(imageCount, rows, cols, gapTwips){
+  const usableW = PAGE_W - 2*MARGIN;
+  const usableH = PAGE_H - 2*MARGIN;
+  const cellW = usableW/cols;
+  const cellH = usableH/rows;
+  gapTwips = Math.min(gapTwips, 0.4*Math.min(cellW,cellH));
+  const pages = [];
+  let idx = 0;
+  while(idx < imageCount){
+    const placements = [];
+    for(let r=0; r<rows; r++){
+      for(let c=0; c<cols; c++){
+        const x = MARGIN + c*cellW + gapTwips/2;
+        const y = MARGIN + r*cellH + gapTwips/2;
+        const w = cellW - gapTwips;
+        const h = cellH - gapTwips;
+        const imageIndex = idx < imageCount ? idx : null;
+        placements.push({x, y, w:Math.max(w,10), h:Math.max(h,10), imageIndex});
+        if(imageIndex !== null) idx++;
+      }
+    }
+    pages.push(placements);
+  }
+  return pages;
+}
+
+// Smart mode: true bin-packing. Globally sorts the whole pool by natural height
+// (LPT heuristic) so the tool can freely reorder for the tightest, most balanced
+// fit — order is not preserved (that's what Grid mode is for).
+function computeSmartLayout(imgs, rows, cols, gap){
+  const uw=PAGE_W-2*MARGIN, uh=PAGE_H-2*MARGIN;
+  gap=Math.min(gap, uw/(cols*3));
+  const cw=(uw-gap*(cols-1))/cols;
+  let rest=imgs.map((o,i)=>{ const a0=o.odd?1/o.aspect:o.aspect, h0=cw/a0; const w=o.odd?h0:cw, h=o.odd?cw:h0; const k=Math.min(1,cw/w,uh/h); return {i,w:w*k,h:h*k}; }).sort((a,b)=>b.h-a.h);
+  const pages=[];
+  while(rest.length){
+    const ch=new Array(cols).fill(0), pl=[], left=[];
+    for(const it of rest){
+      let ci=-1;
+      for(let c=0;c<cols;c++){ const y=ch[c]?ch[c]+gap:0; if(y+it.h<=uh+0.5 && (ci<0 || ch[c]<ch[ci])) ci=c; }
+      if(ci<0){ left.push(it); continue; }
+      const y=ch[ci]?ch[ci]+gap:0;
+      pl.push({x:MARGIN+ci*(cw+gap)+(cw-it.w)/2, y:MARGIN+y, w:it.w, h:it.h, imageIndex:it.i});
+      ch[ci]=y+it.h;
+    }
+    pages.push(pl); rest=left;
+  }
+  return pages;
+}
+
+/* ---------------- live preview ---------------- */
+function renderPreview(){
+  const rows = num(rowsInput,1,10,2), cols = num(colsInput,1,10,2), gapMm = num(gapInput,0,30,4);
+  const gapTwips = Math.round(gapMm * 56.6929);
+  const mode = currentMode();
+  const ready = items.filter(it=>it.status==='ready');
+
+  previewPageEl.querySelectorAll('.ph').forEach(el=>el.remove());
+
+  if(ready.length === 0){
+    previewEmptyEl.style.display = 'block';
+    previewNavEl.style.display = 'none';
+    return;
+  }
+  previewEmptyEl.style.display = 'none';
+
+  const pages = mode==='grid'
+    ? computeGridLayout(ready.length, rows, cols, gapTwips)
+    : computeSmartLayout(ready.map(it=>({aspect:effAspect(it),odd:effRot(it)%180?1:0})), rows, cols, gapTwips);
+
+  previewPageIndex = Math.min(previewPageIndex, pages.length-1);
+  if(previewPageIndex < 0) previewPageIndex = 0;
+
+  previewNavEl.style.display = pages.length>1 ? 'flex' : 'none';
+  previewLabelEl.textContent = `Page ${previewPageIndex+1} of ${pages.length}`;
+  prevPageBtn.disabled = previewPageIndex===0;
+  nextPageBtn.disabled = previewPageIndex===pages.length-1;
+
+  const placements = pages[previewPageIndex];
+  placements.forEach(pl=>{
+    const div = document.createElement('div');
+    div.className = 'ph';
+    div.style.left = (pl.x/PAGE_W*100)+'%';
+    div.style.top = (pl.y/PAGE_H*100)+'%';
+    div.style.width = (pl.w/PAGE_W*100)+'%';
+    div.style.height = (pl.h/PAGE_H*100)+'%';
+    if(pl.imageIndex !== null && pl.imageIndex !== undefined){
+      const img = document.createElement('img');
+      img.src = viewUrl(ready[pl.imageIndex]);
+      div.appendChild(img);
+    }
+    previewPageEl.appendChild(div);
+  });
+}
+
+/* ---------------- rasterize a placement to a JPEG blob ---------------- */
+async function renderPlacementCanvas(item, wTw, hTw, mode){
+  const img=item.img||await loadFull(item);
+  const r=effRot(item), odd=r%180, sw=img.naturalWidth||img.width, sh=img.naturalHeight||img.height, rw=odd?sh:sw, rh=odd?sw:sh;
+  const q=qualitySel.value;
+  let dpi = q==='high'?220 : q==='max'?300 : 150;
+  if(q==='orig') dpi = Math.min(600, Math.max(rw/(wTw/1440), rh/(hTw/1440)));
+  let wPx = Math.max(2, Math.round(wTw/1440*dpi));
+  let hPx = mode==='grid' ? Math.max(2, Math.round(hTw/1440*dpi)) : Math.max(2, Math.round(wPx*rh/rw));
+  if(wPx*hPx > 16e6){ const k=Math.sqrt(16e6/(wPx*hPx)); wPx=Math.round(wPx*k); hPx=Math.round(hPx*k); capNote=true; }
+  const canvas=document.createElement('canvas'); canvas.width=wPx; canvas.height=hPx;
+  const ctx=canvas.getContext('2d'); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  if(mode==='grid'){
+    ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,wPx,hPx);
+    const sc=Math.min(wPx/rw,hPx/rh);
+    drawRot(ctx,img,r,wPx/2,hPx/2,rw*sc,rh*sc);
+  } else {
+    drawRot(ctx,img,r,wPx/2,hPx/2,wPx,hPx);
+  }
+  if(!item.img && img.close) img.close();
+  return new Promise(resolve=> canvas.toBlob(b=>resolve({blob:b,w:wPx,h:hPx}),'image/jpeg',0.90));
+}
+
+/* ---------------- file name helper ---------------- */
+function cleanFileName(raw){
+  let n = (raw||'')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .replace(/\.(pdf|docx)$/i,'')
+    .replace(/^\.+|\.+$/g,'')
+    .trim();
+  return n.slice(0,100);
+}
+
+/* ---------------- built-in ZIP writer (no external library) ---------------- */
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC_T[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function makeZip(files){
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0;
+  for(const f of files){
+    const nm=enc.encode(f.name), crc=crc32(f.data), sz=f.data.length;
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint16(12,0x21,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,sz,true); lh.setUint32(22,sz,true); lh.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(lh.buffer),nm,f.data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint16(14,0x21,true);
+    ch.setUint32(16,crc,true); ch.setUint32(20,sz,true); ch.setUint32(24,sz,true); ch.setUint16(28,nm.length,true); ch.setUint32(42,off,true);
+    central.push(new Uint8Array(ch.buffer),nm);
+    off+=30+nm.length+sz;
+  }
+  let cs=0; central.forEach(c=>cs+=c.length);
+  const e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true); e.setUint32(12,cs,true); e.setUint32(16,off,true);
+  return new Blob([...parts,...central,new Uint8Array(e.buffer)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+
+/* ---------------- OOXML builders ---------------- */
+function buildAnchorXml(relId, cx, cy, x, y, id){
+  return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${x}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${y}</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:wrapNone/><wp:docPr id="${id}" name="Picture ${id}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="Picture ${id}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+}
+
+const CONTENT_TYPES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="jpg" ContentType="image/jpeg"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+
+const PKG_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+async function buildDocx(pages, mode){
+  const enc = new TextEncoder(), files = [];
+  const zip = { file:(n,d)=> files.push({name:n, data: typeof d==='string' ? enc.encode(d) : new Uint8Array(d)}) };
+  const media = { file:(n,d)=> zip.file('word/media/'+n, d) };
+  zip.file('[Content_Types].xml', CONTENT_TYPES_XML);
+  zip.file('_rels/.rels', PKG_RELS_XML);
+
+  const relEntries = [];
+  const bodyParts = [];
+  let imgCounter = 0;
+  let docPrId = 1;
+
+  for(let p=0; p<pages.length; p++){
+    let drawingsXml = '';
+    for(const pl of pages[p]){
+      if(pl.imageIndex === null || pl.imageIndex === undefined) continue;
+      imgCounter++;
+      const relId = 'rId'+imgCounter;
+      const fname = 'image'+imgCounter+'.jpg';
+      const rr = await renderPlacementCanvas(loadedImages[pl.imageIndex].item, pl.w, pl.h, mode);
+      fitBox(pl, rr);
+      const buf = await rr.blob.arrayBuffer();
+      media.file(fname, buf);
+      relEntries.push({id:relId, target:'media/'+fname});
+      const cx = Math.round(pl.w*EMU_PER_TWIP), cy = Math.round(pl.h*EMU_PER_TWIP);
+      const x = Math.round(pl.x*EMU_PER_TWIP), y = Math.round(pl.y*EMU_PER_TWIP);
+      docPrId++;
+      drawingsXml += buildAnchorXml(relId, cx, cy, x, y, docPrId);
+    }
+    bodyParts.push('<w:p>'+drawingsXml+'</w:p>');
+    if(p < pages.length-1){
+      bodyParts.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    }
+  }
+
+  const sectPr = `<w:sectPr><w:pgSz w:w="${PAGE_W}" w:h="${PAGE_H}"${PAGE_W>PAGE_H?' w:orient="landscape"':''}/><w:pgMar w:top="${MARGIN}" w:right="${MARGIN}" w:bottom="${MARGIN}" w:left="${MARGIN}" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>`;
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<w:body>${bodyParts.join('')}${sectPr}</w:body>
+</w:document>`;
+
+  zip.file('word/document.xml', documentXml);
+
+  const docRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${relEntries.map(r=>`<Relationship Id="${r.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${r.target}"/>`).join('\n')}
+</Relationships>`;
+  zip.file('word/_rels/document.xml.rels', docRelsXml);
+
+  return makeZip(files);
+}
+
+/* ---------------- PDF builder (reuses the same layout + rasters as DOCX) ---------------- */
+async function buildPdf(pages, mode){
+  const enc=new TextEncoder(), T=1/20, W=PAGE_W*T, H=PAGE_H*T, objs={};
+  let nid=2; const kids=[];
+  for(const pg of pages){
+    const xo=[]; let content='';
+    for(const pl of pg){
+      if(pl.imageIndex===null || pl.imageIndex===undefined) continue;
+      const r=await renderPlacementCanvas(loadedImages[pl.imageIndex].item, pl.w, pl.h, mode);
+      fitBox(pl, r);
+      const bytes=new Uint8Array(await r.blob.arrayBuffer()), id=++nid;
+      objs[id]={d:`<< /Type /XObject /Subtype /Image /Width ${r.w} /Height ${r.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>`, s:bytes};
+      xo.push(`/Im${xo.length} ${id} 0 R`);
+      content+=`q ${(pl.w*T).toFixed(4)} 0 0 ${(pl.h*T).toFixed(4)} ${(pl.x*T).toFixed(4)} ${(H-(pl.y+pl.h)*T).toFixed(4)} cm /Im${xo.length-1} Do Q\n`;
+    }
+    const cid=++nid, pid=++nid; kids.push(pid);
+    objs[cid]={d:`<< /Length ${content.length} >>`, s:enc.encode(content)};
+    objs[pid]={d:`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W.toFixed(2)} ${H.toFixed(2)}] /Resources << /XObject << ${xo.join(' ')} >> >> /Contents ${cid} 0 R >>`};
+  }
+  objs[1]={d:'<< /Type /Catalog /Pages 2 0 R >>'};
+  objs[2]={d:`<< /Type /Pages /Count ${kids.length} /Kids [${kids.map(k=>k+' 0 R').join(' ')}] >>`};
+  const parts=[], offs=[]; let len=0;
+  const put=d=>{ const b=typeof d==='string'?enc.encode(d):d; parts.push(b); len+=b.length; };
+  put('%PDF-1.4\n');
+  for(let id=1; id<=nid; id++){
+    offs[id]=len; put(`${id} 0 obj\n${objs[id].d}\n`);
+    if(objs[id].s){ put('stream\n'); put(objs[id].s); put('\nendstream\n'); }
+    put('endobj\n');
+  }
+  const xr=len; let x=`xref\n0 ${nid+1}\n0000000000 65535 f \n`;
+  for(let id=1; id<=nid; id++) x+=String(offs[id]).padStart(10,'0')+' 00000 n \n';
+  put(x+`trailer\n<< /Size ${nid+1} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`);
+  return new Blob(parts,{type:'application/pdf'});
+}
+
+/* ---------------- main generate flow ---------------- */
+function timestampSuffix(){
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}_${get('hour')}-${get('minute')}-${get('second')}`;
+}
+
+generateBtn.addEventListener('click', async ()=>{
+  warnBox.style.display = 'none';
+  statusBox.style.display = 'block';
+  generateBtn.disabled = true;
+
+  const rows = num(rowsInput,1,10,2), cols = num(colsInput,1,10,2), gapMm = num(gapInput,0,30,4);
+  const gapTwips = Math.round(gapMm * 56.6929);
+  const mode = currentMode();
+  const format = currentFormat();
+  applyPage(); updateAutoRot(); capNote=false;
+
+  statusBox.textContent = `Finishing image processing...`;
+  await Promise.all(items.map(it=> it.donePromise || Promise.resolve()));
+
+  loadedImages = items
+    .filter(it=> it.status==='ready')
+    .map(it=> ({ item: it, aspect: effAspect(it), odd: effRot(it)%180?1:0, name: it.name }));
+
+  if(loadedImages.length === 0){
+    statusBox.textContent = 'No images could be read. Nothing generated.';
+    showWarnings();
+    generateBtn.disabled = false;
+    return;
+  }
+
+  statusBox.textContent = 'Calculating layout...';
+  const pages = mode === 'grid'
+    ? computeGridLayout(loadedImages.length, rows, cols, gapTwips)
+    : computeSmartLayout(loadedImages, rows, cols, gapTwips);
+
+  statusBox.textContent = `Building document (${pages.length} page${pages.length>1?'s':''})...`;
+  try{
+    const blob = format === 'pdf' ? await buildPdf(pages, mode) : await buildDocx(pages, mode);
+    let href;
+    try{
+      href = URL.createObjectURL(blob);
+    }catch(e){
+      href = await blobToDataURL(blob);
+    }
+    const a = document.createElement('a');
+    a.href = href;
+    const ts = timestampSuffix();
+    const ext = format === 'pdf' ? 'pdf' : 'docx';
+    const custom = cleanFileName(document.getElementById('fileNameInput').value);
+    const fname = custom ? `Arrangix-${custom}.${ext}` : `Arrangix-${mode}-${ts}.${ext}`;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>{ try{ URL.revokeObjectURL(href); }catch(e){} }, 60000);
+    if(capNote){ summaryBox.textContent += ' Note: some photos were reduced to a safe size.'; capNote=false; }
+    statusBox.textContent = `Done — downloaded ${fname} (${pages.length} page${pages.length>1?'s':''}, ${loadedImages.length} image${loadedImages.length>1?'s':''}).`;
+  }catch(err){
+    statusBox.textContent = 'Something went wrong building the document: ' + err.message;
+  }
+
+  showWarnings();
+  generateBtn.disabled = false;
+});
+
+function showWarnings(){
+  const failed = items.filter(it=>it.status==='error');
+  if(failed.length){
+    warnBox.style.display = 'block';
+    warnBox.textContent = failed.map(it=> it.name + ' — could not be read, skipped. (' + it.errorMsg + ')').join('\n');
+  }
+}
+
+loadSettings();
+refreshAll();
+</script>
+<div id="liveMsg" class="sr-only" aria-live="assertive"></div>
+</body>
+</html>
